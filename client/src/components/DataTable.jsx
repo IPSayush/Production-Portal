@@ -18,6 +18,7 @@ export default function DataTable({
   customColumns,
   rows,
   isManager,
+  formattedQuantityTotal,
   onRowsChange,
   onColumnsChange,
   onDeleteRow,
@@ -204,6 +205,21 @@ export default function DataTable({
               </tr>
             ))
           )}
+          <tr className="bg-gray-100 font-semibold text-gray-800 border-t-2 border-gray-300">
+            <td className="border border-gray-200 px-3 py-2 text-gray-600 text-xs uppercase tracking-wide">
+              TOTAL
+            </td>
+            <td className="border border-gray-200 px-3 py-2 font-semibold">
+              {formattedQuantityTotal}
+            </td>
+            <td className="border border-gray-200 px-3 py-2 text-gray-400">—</td>
+            {customColumns.map((col) => (
+              <td key={`total-${col}`} className="border border-gray-200 px-3 py-2 text-gray-400">
+                —
+              </td>
+            ))}
+            {isManager && <td className="border border-gray-200 px-3 py-2"></td>}
+          </tr>
         </tbody>
       </table>
     </div>

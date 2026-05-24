@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiPlus, FiSave } from 'react-icons/fi';
+import { FiArrowLeft, FiPlus, FiSave, FiPackage } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/DataTable';
 import DeleteModal from '../components/DeleteModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { sheetsApi } from '../api';
+import { calculateQuantityTotal, formatQuantityTotal } from '../utils/quantityUtils';
+
 function normalizeRows(rows) {
   return (rows || []).map((row) => ({
     ...row,
@@ -34,6 +36,9 @@ export default function SheetDetail() {
   const [deleteRowTarget, setDeleteRowTarget] = useState(null);
 
   const homePath = role === 'manager' ? '/manager/home' : '/viewer/home';
+
+  const quantityTotal = useMemo(() => calculateQuantityTotal(rows), [rows]);
+  const formattedQuantityTotal = formatQuantityTotal(quantityTotal);
 
   const fetchSheet = useCallback(async () => {
     setLoading(true);
@@ -199,7 +204,16 @@ export default function SheetDetail() {
         )}
       </div>
 
-      <main className="px-2 sm:px-4 py-4">
+      <div className="px-2 sm:px-4 pt-4">
+        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-700 font-medium mb-3">
+          <FiPackage className="w-4 h-4 text-slate-700 shrink-0" />
+          <span>
+            Total Quantity: <span className="font-semibold text-gray-800">{formattedQuantityTotal}</span>
+          </span>
+        </div>
+      </div>
+
+      <main className="px-2 sm:px-4 pb-4">
         {error && (
           <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-3">{error}</p>
         )}
@@ -214,6 +228,8 @@ export default function SheetDetail() {
           customColumns={customColumns}
           rows={rows}
           isManager={isManager}
+          quantityTotal={quantityTotal}
+          formattedQuantityTotal={formattedQuantityTotal}
           onRowsChange={(updated) => markRowsDirty(updated)}
           onColumnsChange={handleColumnsChange}
           onDeleteRow={(row, index) => setDeleteRowTarget({ row, index })}

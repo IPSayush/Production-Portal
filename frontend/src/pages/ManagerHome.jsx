@@ -4,74 +4,99 @@ import Header from '../components/Header';
 import SheetCard from '../components/SheetCard';
 import CreateSheetWizard from '../components/CreateSheetWizard';
 import DeleteModal from '../components/DeleteModal';
-import LoadingSpinner from '../components/LoadingSpinner';
+import SkeletonCard from '../components/SkeletonCard';
+import TopProgressBar from '../components/TopProgressBar';
 import { sheetsApi } from '../api';
+import { useSheets } from '../context/SheetsContext';
 
 export default function ManagerHome() {
-  const [sheets, setSheets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const {
+    sheets,
+    loading,
+    initialLoad,
+    error,
+    fetchSheets,
+    updateSheetInCache,
+    removeSheetFromCache,
+    invalidateCache,
+  } = useSheets();
+
   const [wizardOpen, setWizardOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-
-  const fetchSheets = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await sheetsApi.getAll();
-      setSheets(res.data);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load sheets');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [bgLoading, setBgLoading] = useState(false);
 
   useEffect(() => {
     fetchSheets();
   }, [fetchSheets]);
 
-  const handleDeleteSheet = async (password) => {
-    await sheetsApi.delete(deleteTarget._id, password);
-    setSheets((prev) => prev.filter((s) => s._id !== deleteTarget._id));
-    setDeleteTarget(null);
-  };
+  const handleDeleteSheet = useCallback(async (password) => {
+    setBgLoading(true);
+    try {
+      await sheetsApi.delete(deleteTarget._id, password);
+      removeSheetFromCache(deleteTarget._id);
+      setDeleteTarget(null);
+    } finally {
+      setBgLoading(false);
+    }
+  }, [deleteTarget, removeSheetFromCache]);
 
-  const handleSheetUpdate = (updated) => {
-    setSheets((prev) =>
-      prev.map((s) => (s._id === updated._id ? { ...s, ...updated } : s))
-    );
-  };
+  const handleSheetUpdate = useCallback(
+    (updated) => {
+      updateSheetInCache(updated);
+    },
+    [updateSheetInCache]
+  );
+
+  const handleWizardClose = useCallback(() => {
+    setWizardOpen(false);
+  }, []);
+
+  const handleSheetCreated = useCallback(() => {
+    invalidateCache();
+    fetchSheets(true);
+  }, [invalidateCache, fetchSheets]);
+
+  const showSkeleton = initialLoad && loading;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <TopProgressBar loading={bgLoading || (loading && !initialLoad)} />
       <Header />
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        <button
-          type="button"
-          onClick={() => setWizardOpen(true)}
-          className="w-full flex items-center justify-center gap-2 bg-slate-700 text-white px-4 py-3 rounded-lg hover:bg-slate-800 text-sm font-medium mb-6"
-        >
-          <FiPlus className="w-5 h-5" />
-          Create New Sheet
-        </button>
+      <main className="max-w-4xl mx-auto px-4 py-4 sm:py-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="w-full lg:w-auto flex items-center justify-center gap-2 bg-slate-700 text-white px-4 py-3 rounded-lg hover:bg-slate-800 text-sm font-medium min-h-[44px] order-first lg:order-last"
+          >
+            <FiPlus className="w-5 h-5" />
+            Create New Sheet
+          </button>
+        </div>
 
         {error && (
-          <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-4">{error}</p>
+          <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-4">
+            {error}
+          </p>
         )}
 
-        {loading ? (
-          <LoadingSpinner />
-        ) : sheets.length === 0 ? (
-          <p className="text-center text-gray-500 py-12">No sheets yet. Create your first sheet.</p>
-        ) : (
+        {showSkeleton ? (
           <div className="space-y-3">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : sheets.length === 0 ? (
+          <p className="text-center text-gray-500 py-12 text-sm sm:text-base">
+            No sheets yet. Create your first sheet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {sheets.map((sheet) => (
               <SheetCard
                 key={sheet._id}
                 sheet={sheet}
-                isManager
                 onDelete={setDeleteTarget}
                 onUpdate={handleSheetUpdate}
               />
@@ -80,7 +105,11 @@ export default function ManagerHome() {
         )}
       </main>
 
-      <CreateSheetWizard isOpen={wizardOpen} onClose={() => setWizardOpen(false)} />
+      <CreateSheetWizard
+        isOpen={wizardOpen}
+        onClose={handleWizardClose}
+        onCreated={handleSheetCreated}
+      />
 
       <DeleteModal
         isOpen={!!deleteTarget}

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import LoadingSpinner from './LoadingSpinner';
 
 export default function DeleteModal({ isOpen, onClose, onConfirm, itemType }) {
   const [password, setPassword] = useState('');
@@ -31,8 +30,12 @@ export default function DeleteModal({ isOpen, onClose, onConfirm, itemType }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50">
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl p-6 shadow-2xl sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:rounded-xl sm:max-w-sm sm:w-full sm:mx-4 sm:shadow-xl"
+        role="dialog"
+        aria-modal="true"
+      >
         <h2 className="text-lg font-semibold text-gray-800 mb-2">Confirm Delete</h2>
         <p className="text-sm text-gray-500 mb-4">
           Enter your password to delete this {itemType}.
@@ -43,7 +46,7 @@ export default function DeleteModal({ isOpen, onClose, onConfirm, itemType }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+            className="w-full border border-gray-200 rounded-lg px-3 py-3 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[44px]"
             required
             autoFocus
           />
@@ -52,21 +55,20 @@ export default function DeleteModal({ isOpen, onClose, onConfirm, itemType }) {
             <button
               type="button"
               onClick={handleClose}
-              className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm"
+              className="border border-gray-300 text-gray-600 px-4 py-3 rounded-lg hover:bg-gray-50 text-sm min-h-[44px]"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 text-sm"
+              className="bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 text-sm min-h-[44px] min-w-[100px] disabled:opacity-50"
               disabled={loading || !password}
             >
               {loading ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </form>
-        {loading && <LoadingSpinner />}
       </div>
     </div>
   );

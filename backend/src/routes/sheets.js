@@ -21,23 +21,34 @@ async function verifyManagerPassword(userId, password) {
   return bcrypt.compare(password, user.password);
 }
 
+function sheetListProjection() {
+  return {
+    rows: 0,
+  };
+}
+
+function toListItem(sheet) {
+  return {
+    _id: sheet._id,
+    title: sheet.title,
+    description: sheet.description || '',
+    status: sheet.status || 'Upcoming',
+    customColumns: sheet.customColumns,
+    targetQuantity: sheet.targetQuantity ?? 0,
+    achievedQuantity: sheet.achievedQuantity ?? 0,
+    rowCount: sheet.rowCount ?? 0,
+    createdAt: sheet.createdAt,
+    updatedAt: sheet.updatedAt,
+  };
+}
+
 router.get('/', async (req, res) => {
   try {
-    const sheets = await Sheet.find()
-      .select('title customColumns rows createdAt updatedAt')
+    const sheets = await Sheet.find({}, sheetListProjection())
       .sort({ createdAt: -1 })
       .lean();
 
-    const result = sheets.map((sheet) => ({
-      _id: sheet._id,
-      title: sheet.title,
-      customColumns: sheet.customColumns,
-      rowCount: sheet.rows ? sheet.rows.length : 0,
-      createdAt: sheet.createdAt,
-      updatedAt: sheet.updatedAt,
-    }));
-
-    res.json(result);
+    res.json(sheets.map(toListItem));
   } catch (err) {
     console.error('Get sheets error:', err);
     res.status(500).json({ message: 'Server error' });
@@ -46,7 +57,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', requireManager, async (req, res) => {
   try {
-    const { title, customColumns } = req.body;
+    const { title, description, customColumns, targetQuantity } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ message: 'Sheet title is required' });
@@ -54,8 +65,15 @@ router.post('/', requireManager, async (req, res) => {
 
     const sheet = await Sheet.create({
       title: title.trim(),
+      description: description ? String(description).trim().slice(0, 300) : '',
       customColumns: customColumns || [],
+      targetQuantity:
+        targetQuantity != null && targetQuantity !== ''
+          ? Math.max(0, Number(targetQuantity) || 0)
+          : 0,
       rows: [],
+      rowCount: 0,
+      achievedQuantity: 0,
     });
 
     res.status(201).json(sheet);
@@ -71,7 +89,7 @@ router.get('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Invalid sheet ID' });
     }
 
-    const sheet = await Sheet.findById(req.params.id);
+    const sheet = await Sheet.findById(req.params.id).lean();
     if (!sheet) {
       return res.status(404).json({ message: 'Sheet not found' });
     }
@@ -83,13 +101,42 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.patch('/:id/status', requireManager, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid sheet ID' });
+    }
+
+    const { status } = req.body;
+    const allowed = ['Working', 'Completed', 'Upcoming'];
+    if (!status || !allowed.includes(status)) {
+      return res.status(400).json({ message: 'Invalid status value' });
+    }
+
+    const sheet = await Sheet.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!sheet) {
+      return res.status(404).json({ message: 'Sheet not found' });
+    }
+
+    res.json(toListItem(sheet));
+  } catch (err) {
+    console.error('Update status error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.put('/:id', requireManager, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid sheet ID' });
     }
 
-    const { title, customColumns } = req.body;
+    const { title, description, customColumns } = req.body;
     const sheet = await Sheet.findById(req.params.id);
     if (!sheet) {
       return res.status(404).json({ message: 'Sheet not found' });
@@ -97,6 +144,9 @@ router.put('/:id', requireManager, async (req, res) => {
 
     if (title !== undefined) {
       sheet.title = title.trim();
+    }
+    if (description !== undefined) {
+      sheet.description = String(description).trim().slice(0, 300);
     }
     if (customColumns !== undefined) {
       sheet.customColumns = customColumns;
@@ -157,12 +207,17 @@ router.post('/:sheetId/rows', requireManager, async (req, res) => {
       });
     }
 
+    const qty = quantity != null ? Number(quantity) : 0;
+
     sheet.rows.push({
       date: date ? new Date(date) : new Date(),
-      quantity: quantity != null ? Number(quantity) : 0,
+      quantity: qty,
       description: description || '',
       customValues: customMap,
     });
+
+    sheet.rowCount = (sheet.rowCount || 0) + 1;
+    sheet.achievedQuantity = (sheet.achievedQuantity || 0) + qty;
 
     await sheet.save();
     const newRow = sheet.rows[sheet.rows.length - 1];
@@ -193,6 +248,8 @@ router.put('/:sheetId/rows/:rowId', requireManager, async (req, res) => {
       return res.status(404).json({ message: 'Row not found' });
     }
 
+    const oldQty = Number(row.quantity) || 0;
+
     if (date !== undefined) row.date = new Date(date);
     if (quantity !== undefined) row.quantity = Number(quantity);
     if (description !== undefined) row.description = description;
@@ -204,6 +261,9 @@ router.put('/:sheetId/rows/:rowId', requireManager, async (req, res) => {
       });
       row.customValues = customMap;
     }
+
+    const newQty = Number(row.quantity) || 0;
+    sheet.achievedQuantity = (sheet.achievedQuantity || 0) + (newQty - oldQty);
 
     await sheet.save();
     res.json(row);
@@ -242,7 +302,11 @@ router.delete('/:sheetId/rows/:rowId', requireManager, async (req, res) => {
       return res.status(404).json({ message: 'Row not found' });
     }
 
+    const qty = Number(row.quantity) || 0;
     row.deleteOne();
+    sheet.rowCount = Math.max(0, (sheet.rowCount || 0) - 1);
+    sheet.achievedQuantity = Math.max(0, (sheet.achievedQuantity || 0) - qty);
+
     await sheet.save();
     res.json({ message: 'Row deleted successfully' });
   } catch (err) {

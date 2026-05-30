@@ -1,16 +1,25 @@
 const mongoose = require('mongoose');
 
-const connection = {};
+let cached = global.mongoose;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
 async function connectDB() {
-  // Agar connection pehle se hai toh wahi use karein
-  if (connection.isConnected) {
-    return;
+  if (cached.conn) {
+    return cached.conn;
   }
 
-  // Naya connection banayein
-  const db = await mongoose.connect(process.env.MONGO_URI);
-  connection.isConnected = db.connections[0].readyState;
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(process.env.MONGO_URI, {
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 10000,
+    });
+  }
+
+  cached.conn = await cached.promise;
+  return cached.conn;
 }
 
 module.exports = connectDB;

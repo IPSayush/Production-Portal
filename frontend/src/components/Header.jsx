@@ -46,11 +46,10 @@ export default function Header({ subtitle, title, centerTitle = false }) {
   const { logout } = useAuth();
 
   return (
-    {/* 'relative' class add kiya gaya hai absolute positioning ke liye */}
+    // 'relative' class add kiya gaya hai absolute positioning ke liye
     <header className="bg-white border-b border-slate-200 px-4 flex items-center justify-between sticky top-0 z-30 shadow-sm h-[52px] md:h-[60px] relative">
       
       {centerTitle ? (
-        /* Left side ka empty div layout maintain rakhega */
         <div className="flex-1" />
       ) : (
         <div className="min-w-0">
@@ -66,7 +65,6 @@ export default function Header({ subtitle, title, centerTitle = false }) {
       )}
 
       {centerTitle && (
-        /* Absolute positioning se title hamesha center rahega */
         <h1 className="absolute left-1/2 -translate-x-1/2 text-sm md:text-base font-bold text-slate-800 tracking-tight truncate max-w-[50%] md:max-w-[60%] text-center px-2">
           {title}
         </h1>

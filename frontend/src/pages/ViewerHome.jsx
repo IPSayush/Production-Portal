@@ -120,7 +120,7 @@ export default function ViewerHome() {
 
                 <ProgressSummaryCompact
                   targetQuantity={sheet.targetQuantity}
-                  achievedQuantity={sheet.achievedQuantity}
+                  // achievedQuantity={sheet.achievedQuantity}
                 />
 
                 <button

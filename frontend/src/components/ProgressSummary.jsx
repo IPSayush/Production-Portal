@@ -24,7 +24,7 @@ export function ProgressSummaryFull({ targetQuantity, achievedQuantity }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span>🎯 Target: {formatUnits(target)}</span>
         <span className="text-slate-300 hidden sm:inline">|</span>
-        <span>✅ Done: {formatUnits(achieved)}</span>
+        <span>✅ Completed: {formatUnits(achieved)}</span>
         <span className="text-slate-300 hidden sm:inline">|</span>
         {targetReached ? (
           <span className="text-green-600 font-medium">✅ Target Reached!</span>

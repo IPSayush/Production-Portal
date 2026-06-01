@@ -118,10 +118,10 @@ export default function ViewerHome() {
                   </p>
                 ) : null}
 
-                {/* <ProgressSummaryCompact
+                <ProgressSummaryCompact
                   targetQuantity={sheet.targetQuantity}
                   achievedQuantity={sheet.achievedQuantity}
-                /> */}
+                />
 
                 <button
                   type="button"

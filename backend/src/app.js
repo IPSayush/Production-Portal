@@ -14,6 +14,7 @@ const corsOptions = {
     process.env.FRONTEND_URL,
     'http://localhost:5173',
     'http://localhost:4173',
+    'https://production-portal-tttt.pages.dev'
   ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

@@ -22,6 +22,10 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use((req, res, next) => {
+  console.log('Origin:', req.headers.origin);
+  next();
+});
 app.options('*', cors(corsOptions));
 
 // ─── Body parsing ───

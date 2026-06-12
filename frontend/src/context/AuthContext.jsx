@@ -2,6 +2,7 @@ import { createContext, useContext, useReducer, useEffect, useCallback } from 'r
 import { authApi, setUnauthorizedHandler } from '../api';
 
 const TOKEN_KEY = 'prod_portal_token';
+const USER_KEY = 'prod_portal_user';
 
 const initialState = {
   user: null,
@@ -49,11 +50,13 @@ export function AuthProvider({ children }) {
       // ignore logout errors
     }
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     dispatch({ type: 'LOGOUT' });
   }, [state.role, state.token]);
 
   const handleUnauthorized = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     dispatch({ type: 'LOGOUT' });
     window.location.href = '/landing';
   }, []);
@@ -62,6 +65,7 @@ export function AuthProvider({ children }) {
     setUnauthorizedHandler(handleUnauthorized);
   }, [handleUnauthorized]);
 
+  // ─── Persistent login: restore user from localStorage instantly, then verify with server ───
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) {
@@ -69,17 +73,43 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    // Instantly restore cached user data so the UI loads without waiting for the server
+    const cachedUser = localStorage.getItem(USER_KEY);
+    if (cachedUser) {
+      try {
+        const user = JSON.parse(cachedUser);
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          payload: { token, user },
+        });
+      } catch {
+        // corrupted cache, ignore
+      }
+    }
+
+    // Verify with server in background (updates cached data if valid, clears if invalid)
     authApi
       .me()
       .then((res) => {
+        const user = res.data.user;
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
         dispatch({
           type: 'LOGIN_SUCCESS',
-          payload: { token, user: res.data.user },
+          payload: { token, user },
         });
       })
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        dispatch({ type: 'SET_LOADING', payload: false });
+      .catch((err) => {
+        // Only clear on 401 (session invalid). Network errors keep the cached state.
+        if (err.response?.status === 401) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          dispatch({ type: 'LOGOUT' });
+        } else {
+          // Network error — keep cached user if we have one, otherwise clear loading
+          if (!cachedUser) {
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
+        }
       });
   }, []);
 
@@ -89,7 +119,9 @@ export function AuthProvider({ children }) {
     try {
       const res = await authApi.login(userId, password, role);
       const { token, user } = res.data;
+      // Persist both token and user data for instant restore on next visit
       localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
       dispatch({ type: 'LOGIN_SUCCESS', payload: { token, user } });
       return user;
     } catch (err) {

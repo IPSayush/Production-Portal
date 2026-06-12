@@ -1,6 +1,5 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const mongoose = require('mongoose');
 const Sheet = require('../models/Sheet');
 const User = require('../models/User');
 const {
@@ -8,10 +7,19 @@ const {
   verifyViewerSession,
   requireManager,
 } = require('../middleware/authMiddleware');
+const {
+  validateObjectId,
+  validateSheetBody,
+  validateRowBody,
+  validateStatus,
+  validatePasswordBody,
+} = require('../middleware/validate');
 
 const router = express.Router();
 
 router.use(authenticate, verifyViewerSession);
+
+// ─── Helpers ───
 
 async function verifyManagerPassword(userId, password) {
   const user = await User.findOne({ userId });
@@ -19,6 +27,17 @@ async function verifyManagerPassword(userId, password) {
     return false;
   }
   return bcrypt.compare(password, user.password);
+}
+
+/**
+ * Recalculate achievedQuantity and rowCount from actual rows.
+ * This prevents drift from crashes or race conditions.
+ */
+function recalculateFromRows(sheet) {
+  sheet.rowCount = sheet.rows.length;
+  sheet.achievedQuantity = sheet.rows.reduce((sum, row) => {
+    return sum + (Number(row.quantity) || 0);
+  }, 0);
 }
 
 function sheetListProjection() {
@@ -42,20 +61,39 @@ function toListItem(sheet) {
   };
 }
 
+// ─── GET all sheets (with pagination) ───
 router.get('/', async (req, res) => {
   try {
-    const sheets = await Sheet.find({}, sheetListProjection())
-      .sort({ createdAt: -1 })
-      .lean();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const skip = (page - 1) * limit;
 
-    res.json(sheets.map(toListItem));
+    const [sheets, totalCount] = await Promise.all([
+      Sheet.find({}, sheetListProjection())
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Sheet.countDocuments(),
+    ]);
+
+    res.json({
+      data: sheets.map(toListItem),
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (err) {
     console.error('Get sheets error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-router.post('/', requireManager, async (req, res) => {
+// ─── POST create sheet ───
+router.post('/', requireManager, validateSheetBody, async (req, res) => {
   try {
     const { title, description, customColumns, targetQuantity } = req.body;
 
@@ -83,236 +121,253 @@ router.post('/', requireManager, async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+// ─── GET single sheet (with row pagination) ───
+router.get('/:id', validateObjectId('id'), async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid sheet ID' });
-    }
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
 
     const sheet = await Sheet.findById(req.params.id).lean();
     if (!sheet) {
       return res.status(404).json({ message: 'Sheet not found' });
     }
 
-    res.json(sheet);
+    // Sort rows by date descending
+    const allRows = sheet.rows || [];
+    allRows.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const totalRows = allRows.length;
+    const start = (page - 1) * limit;
+    const paginatedRows = allRows.slice(start, start + limit);
+
+    res.json({
+      ...sheet,
+      rows: paginatedRows,
+      rowPagination: {
+        page,
+        limit,
+        totalCount: totalRows,
+        totalPages: Math.ceil(totalRows / limit),
+      },
+    });
   } catch (err) {
     console.error('Get sheet error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-router.patch('/:id/status', requireManager, async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid sheet ID' });
+// ─── PATCH update status ───
+router.patch(
+  '/:id/status',
+  requireManager,
+  validateObjectId('id'),
+  validateStatus,
+  async (req, res) => {
+    try {
+      const { status } = req.body;
+
+      const sheet = await Sheet.findByIdAndUpdate(
+        req.params.id,
+        { status },
+        { new: true, runValidators: true }
+      ).lean();
+
+      if (!sheet) {
+        return res.status(404).json({ message: 'Sheet not found' });
+      }
+
+      res.json(toListItem(sheet));
+    } catch (err) {
+      console.error('Update status error:', err);
+      res.status(500).json({ message: 'Server error' });
     }
-
-    const { status } = req.body;
-    const allowed = ['Working', 'Completed', 'Upcoming'];
-    if (!status || !allowed.includes(status)) {
-      return res.status(400).json({ message: 'Invalid status value' });
-    }
-
-    const sheet = await Sheet.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true }
-    ).lean();
-
-    if (!sheet) {
-      return res.status(404).json({ message: 'Sheet not found' });
-    }
-
-    res.json(toListItem(sheet));
-  } catch (err) {
-    console.error('Update status error:', err);
-    res.status(500).json({ message: 'Server error' });
   }
-});
+);
 
-router.put('/:id', requireManager, async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid sheet ID' });
-    }
+// ─── PUT update sheet ───
+router.put(
+  '/:id',
+  requireManager,
+  validateObjectId('id'),
+  validateSheetBody,
+  async (req, res) => {
+    try {
+      const { title, description, customColumns } = req.body;
+      const sheet = await Sheet.findById(req.params.id);
+      if (!sheet) {
+        return res.status(404).json({ message: 'Sheet not found' });
+      }
 
-    const { title, description, customColumns } = req.body;
-    const sheet = await Sheet.findById(req.params.id);
-    if (!sheet) {
-      return res.status(404).json({ message: 'Sheet not found' });
-    }
+      if (title !== undefined) {
+        sheet.title = title.trim();
+      }
+      if (description !== undefined) {
+        sheet.description = String(description).trim().slice(0, 300);
+      }
+      if (customColumns !== undefined) {
+        sheet.customColumns = customColumns;
+      }
 
-    if (title !== undefined) {
-      sheet.title = title.trim();
+      await sheet.save();
+      res.json(sheet);
+    } catch (err) {
+      console.error('Update sheet error:', err);
+      res.status(500).json({ message: 'Server error' });
     }
-    if (description !== undefined) {
-      sheet.description = String(description).trim().slice(0, 300);
-    }
-    if (customColumns !== undefined) {
-      sheet.customColumns = customColumns;
-    }
-
-    await sheet.save();
-    res.json(sheet);
-  } catch (err) {
-    console.error('Update sheet error:', err);
-    res.status(500).json({ message: 'Server error' });
   }
-});
+);
 
-router.delete('/:id', requireManager, async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid sheet ID' });
+// ─── DELETE sheet ───
+router.delete(
+  '/:id',
+  requireManager,
+  validateObjectId('id'),
+  validatePasswordBody,
+  async (req, res) => {
+    try {
+      const { password } = req.body;
+
+      const valid = await verifyManagerPassword(req.user.userId, password);
+      if (!valid) {
+        return res.status(401).json({ message: 'Incorrect password' });
+      }
+
+      const sheet = await Sheet.findByIdAndDelete(req.params.id);
+      if (!sheet) {
+        return res.status(404).json({ message: 'Sheet not found' });
+      }
+
+      res.json({ message: 'Sheet deleted successfully' });
+    } catch (err) {
+      console.error('Delete sheet error:', err);
+      res.status(500).json({ message: 'Server error' });
     }
-
-    const { password } = req.body;
-    if (!password) {
-      return res.status(400).json({ message: 'Password is required' });
-    }
-
-    const valid = await verifyManagerPassword(req.user.userId, password);
-    if (!valid) {
-      return res.status(401).json({ message: 'Incorrect password' });
-    }
-
-    const sheet = await Sheet.findByIdAndDelete(req.params.id);
-    if (!sheet) {
-      return res.status(404).json({ message: 'Sheet not found' });
-    }
-
-    res.json({ message: 'Sheet deleted successfully' });
-  } catch (err) {
-    console.error('Delete sheet error:', err);
-    res.status(500).json({ message: 'Server error' });
   }
-});
+);
 
-router.post('/:sheetId/rows', requireManager, async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.sheetId)) {
-      return res.status(400).json({ message: 'Invalid sheet ID' });
-    }
+// ─── POST add row ───
+router.post(
+  '/:sheetId/rows',
+  requireManager,
+  validateObjectId('sheetId'),
+  validateRowBody,
+  async (req, res) => {
+    try {
+      const { date, quantity, description, customValues } = req.body;
+      const sheet = await Sheet.findById(req.params.sheetId);
+      if (!sheet) {
+        return res.status(404).json({ message: 'Sheet not found' });
+      }
 
-    const { date, quantity, description, customValues } = req.body;
-    const sheet = await Sheet.findById(req.params.sheetId);
-    if (!sheet) {
-      return res.status(404).json({ message: 'Sheet not found' });
-    }
-
-    const customMap = new Map();
-    if (customValues && typeof customValues === 'object') {
-      Object.entries(customValues).forEach(([key, value]) => {
-        customMap.set(key, value != null ? String(value) : '');
-      });
-    }
-
-    const qty = quantity != null ? Number(quantity) : 0;
-
-    sheet.rows.push({
-      date: date ? new Date(date) : new Date(),
-      quantity: qty,
-      description: description || '',
-      customValues: customMap,
-    });
-
-    sheet.rowCount = (sheet.rowCount || 0) + 1;
-    sheet.achievedQuantity = (sheet.achievedQuantity || 0) + qty;
-
-    await sheet.save();
-    const newRow = sheet.rows[sheet.rows.length - 1];
-    res.status(201).json(newRow);
-  } catch (err) {
-    console.error('Add row error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.put('/:sheetId/rows/:rowId', requireManager, async (req, res) => {
-  try {
-    if (
-      !mongoose.Types.ObjectId.isValid(req.params.sheetId) ||
-      !mongoose.Types.ObjectId.isValid(req.params.rowId)
-    ) {
-      return res.status(400).json({ message: 'Invalid ID' });
-    }
-
-    const { date, quantity, description, customValues } = req.body;
-    const sheet = await Sheet.findById(req.params.sheetId);
-    if (!sheet) {
-      return res.status(404).json({ message: 'Sheet not found' });
-    }
-
-    const row = sheet.rows.id(req.params.rowId);
-    if (!row) {
-      return res.status(404).json({ message: 'Row not found' });
-    }
-
-    const oldQty = Number(row.quantity) || 0;
-
-    if (date !== undefined) row.date = new Date(date);
-    if (quantity !== undefined) row.quantity = Number(quantity);
-    if (description !== undefined) row.description = description;
-
-    if (customValues && typeof customValues === 'object') {
       const customMap = new Map();
-      Object.entries(customValues).forEach(([key, value]) => {
-        customMap.set(key, value != null ? String(value) : '');
+      if (customValues && typeof customValues === 'object') {
+        Object.entries(customValues).forEach(([key, value]) => {
+          customMap.set(key, value != null ? String(value) : '');
+        });
+      }
+
+      const qty = quantity != null ? Number(quantity) : 0;
+
+      sheet.rows.push({
+        date: date ? new Date(date) : new Date(),
+        quantity: qty,
+        description: description || '',
+        customValues: customMap,
       });
-      row.customValues = customMap;
+
+      // Recalculate from actual rows to prevent drift
+      recalculateFromRows(sheet);
+
+      await sheet.save();
+      const newRow = sheet.rows[sheet.rows.length - 1];
+      res.status(201).json(newRow);
+    } catch (err) {
+      console.error('Add row error:', err);
+      res.status(500).json({ message: 'Server error' });
     }
-
-    const newQty = Number(row.quantity) || 0;
-    sheet.achievedQuantity = (sheet.achievedQuantity || 0) + (newQty - oldQty);
-
-    await sheet.save();
-    res.json(row);
-  } catch (err) {
-    console.error('Update row error:', err);
-    res.status(500).json({ message: 'Server error' });
   }
-});
+);
 
-router.delete('/:sheetId/rows/:rowId', requireManager, async (req, res) => {
-  try {
-    if (
-      !mongoose.Types.ObjectId.isValid(req.params.sheetId) ||
-      !mongoose.Types.ObjectId.isValid(req.params.rowId)
-    ) {
-      return res.status(400).json({ message: 'Invalid ID' });
+// ─── PUT update row ───
+router.put(
+  '/:sheetId/rows/:rowId',
+  requireManager,
+  validateObjectId('sheetId', 'rowId'),
+  validateRowBody,
+  async (req, res) => {
+    try {
+      const { date, quantity, description, customValues } = req.body;
+      const sheet = await Sheet.findById(req.params.sheetId);
+      if (!sheet) {
+        return res.status(404).json({ message: 'Sheet not found' });
+      }
+
+      const row = sheet.rows.id(req.params.rowId);
+      if (!row) {
+        return res.status(404).json({ message: 'Row not found' });
+      }
+
+      if (date !== undefined) row.date = new Date(date);
+      if (quantity !== undefined) row.quantity = Number(quantity);
+      if (description !== undefined) row.description = description;
+
+      if (customValues && typeof customValues === 'object') {
+        const customMap = new Map();
+        Object.entries(customValues).forEach(([key, value]) => {
+          customMap.set(key, value != null ? String(value) : '');
+        });
+        row.customValues = customMap;
+      }
+
+      // Recalculate from actual rows to prevent drift
+      recalculateFromRows(sheet);
+
+      await sheet.save();
+      res.json(row);
+    } catch (err) {
+      console.error('Update row error:', err);
+      res.status(500).json({ message: 'Server error' });
     }
-
-    const { password } = req.body;
-    if (!password) {
-      return res.status(400).json({ message: 'Password is required' });
-    }
-
-    const valid = await verifyManagerPassword(req.user.userId, password);
-    if (!valid) {
-      return res.status(401).json({ message: 'Incorrect password' });
-    }
-
-    const sheet = await Sheet.findById(req.params.sheetId);
-    if (!sheet) {
-      return res.status(404).json({ message: 'Sheet not found' });
-    }
-
-    const row = sheet.rows.id(req.params.rowId);
-    if (!row) {
-      return res.status(404).json({ message: 'Row not found' });
-    }
-
-    const qty = Number(row.quantity) || 0;
-    row.deleteOne();
-    sheet.rowCount = Math.max(0, (sheet.rowCount || 0) - 1);
-    sheet.achievedQuantity = Math.max(0, (sheet.achievedQuantity || 0) - qty);
-
-    await sheet.save();
-    res.json({ message: 'Row deleted successfully' });
-  } catch (err) {
-    console.error('Delete row error:', err);
-    res.status(500).json({ message: 'Server error' });
   }
-});
+);
+
+// ─── DELETE row ───
+router.delete(
+  '/:sheetId/rows/:rowId',
+  requireManager,
+  validateObjectId('sheetId', 'rowId'),
+  validatePasswordBody,
+  async (req, res) => {
+    try {
+      const { password } = req.body;
+
+      const valid = await verifyManagerPassword(req.user.userId, password);
+      if (!valid) {
+        return res.status(401).json({ message: 'Incorrect password' });
+      }
+
+      const sheet = await Sheet.findById(req.params.sheetId);
+      if (!sheet) {
+        return res.status(404).json({ message: 'Sheet not found' });
+      }
+
+      const row = sheet.rows.id(req.params.rowId);
+      if (!row) {
+        return res.status(404).json({ message: 'Row not found' });
+      }
+
+      row.deleteOne();
+
+      // Recalculate from actual rows to prevent drift
+      recalculateFromRows(sheet);
+
+      await sheet.save();
+      res.json({ message: 'Row deleted successfully' });
+    } catch (err) {
+      console.error('Delete row error:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
 
 module.exports = router;

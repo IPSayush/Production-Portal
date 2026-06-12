@@ -24,9 +24,11 @@ export function SheetsProvider({ children }) {
     setError('');
     try {
       const res = await sheetsApi.getAll();
-      setSheets(res.data);
+      // Backend now returns { data: [...], pagination: {...} }
+      const sheetList = res.data.data || res.data;
+      setSheets(sheetList);
       cacheValid.current = true;
-      return res.data;
+      return sheetList;
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load sheets');
       throw err;

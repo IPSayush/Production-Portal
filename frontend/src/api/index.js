@@ -24,14 +24,18 @@ export function setUnauthorizedHandler(handler) {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // Only handle 401 from server responses (not network errors)
     if (err.response?.status === 401) {
+      // Session invalidated by server (viewer logged in elsewhere, or token expired)
       localStorage.removeItem('prod_portal_token');
+      localStorage.removeItem('prod_portal_user');
       if (onUnauthorized) {
         onUnauthorized(err.response?.data?.message);
       } else {
         window.location.href = '/landing';
       }
     }
+    // For network errors, do NOT clear the token — the user may just be offline
     return Promise.reject(err);
   }
 );
@@ -44,8 +48,10 @@ export const authApi = {
 };
 
 export const sheetsApi = {
-  getAll: () => api.get('/sheets'),
-  getOne: (id) => api.get(`/sheets/${id}`),
+  getAll: (page = 1, limit = 50) =>
+    api.get('/sheets', { params: { page, limit } }),
+  getOne: (id, page = 1, limit = 50) =>
+    api.get(`/sheets/${id}`, { params: { page, limit } }),
   create: (data) => api.post('/sheets', data),
   update: (id, data) => api.put(`/sheets/${id}`, data),
   updateStatus: (id, status) => api.patch(`/sheets/${id}/status`, { status }),

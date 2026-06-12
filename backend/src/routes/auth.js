@@ -4,16 +4,14 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const { authenticate, verifyViewerSession } = require('../middleware/authMiddleware');
+const { validateLoginBody } = require('../middleware/validate');
 
 const router = express.Router();
 
-router.post('/login', async (req, res) => {
+// ─── Login ───
+router.post('/login', validateLoginBody, async (req, res) => {
   try {
     const { userId, password, role } = req.body;
-
-    if (!userId || !password || !role) {
-      return res.status(400).json({ message: 'User ID, password, and role are required' });
-    }
 
     const user = await User.findOne({ userId: String(userId).trim() });
     if (!user) {
@@ -36,6 +34,7 @@ router.post('/login', async (req, res) => {
       await user.save();
     }
 
+    // Long-lived token for persistent login (1 year)
     const token = jwt.sign(
       {
         userId: user.userId,
@@ -44,7 +43,7 @@ router.post('/login', async (req, res) => {
         name: user.name,
       },
       process.env.JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: '365d' }
     );
 
     res.json({
@@ -57,6 +56,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// ─── Logout ───
 router.post('/logout', authenticate, verifyViewerSession, async (req, res) => {
   try {
     if (req.user.role === 'viewer') {
@@ -72,6 +72,7 @@ router.post('/logout', authenticate, verifyViewerSession, async (req, res) => {
   }
 });
 
+// ─── Get current user ───
 router.get('/me', authenticate, verifyViewerSession, async (req, res) => {
   try {
     const user = await User.findOne({ userId: req.user.userId }).select('-password');

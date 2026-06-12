@@ -64,7 +64,8 @@ export default function SheetDetail() {
     setLoading(true);
     setError('');
     try {
-      const res = await sheetsApi.getOne(id);
+      // Request all rows (high limit) since this page manages them client-side
+      const res = await sheetsApi.getOne(id, 1, 10000);
       const data = res.data;
       setSheet(data);
       setTitle(data.title);

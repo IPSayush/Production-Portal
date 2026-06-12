@@ -1,8 +1,19 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { FiEye, FiSettings, FiBox } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { isAuthenticated, isManager, loading } = useAuth();
+
+  // If still checking auth state, show spinner
+  if (loading) return <LoadingSpinner fullScreen />;
+
+  // If already logged in, redirect to the appropriate home page
+  if (isAuthenticated) {
+    return <Navigate to={isManager ? '/manager/home' : '/viewer/home'} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-12">

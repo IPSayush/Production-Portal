@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { FiUser, FiLock } from 'react-icons/fi';
@@ -8,14 +8,19 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const role = searchParams.get('role') === 'viewer' ? 'viewer' : 'manager';
   const navigate = useNavigate();
-  const { login, error, loading } = useAuth();
+  const { login, error, loading, isAuthenticated, isManager } = useAuth();
 
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
 
-  const isManager = role === 'manager';
-  const title = isManager ? 'Manager Login' : 'Viewer Login';
+  // If already logged in, redirect to dashboard
+  if (isAuthenticated) {
+    return <Navigate to={isManager ? '/manager/home' : '/viewer/home'} replace />;
+  }
+
+  const isManagerRole = role === 'manager';
+  const title = isManagerRole ? 'Manager Login' : 'Viewer Login';
 
   const handleSubmit = async (e) => {
     e.preventDefault();

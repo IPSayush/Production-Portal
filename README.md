@@ -39,15 +39,7 @@ npm run dev
 
 App runs at `http://localhost:5173`.
 
-## Default Credentials
 
-| Role | User ID | Password | Name |
-|------|---------|----------|------|
-| Production Manager | 9569374626 | ayush | Ayush |
-| Viewer 1 | 6280348611 | akash | Akash |
-| Viewer 2 | 8302220000 | prateek | Prateek |
-
-Users are seeded automatically on server startup if they do not exist.
 
 ## Environment Variables
 

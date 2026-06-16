@@ -42,7 +42,7 @@
 import { FiLogOut } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 
-export default function Header({ subtitle, title, centerTitle = false }) {
+export default function Header({ subtitle, title, centerTitle = false, actions }) {
   const { logout } = useAuth();
 
   return (
@@ -70,15 +70,18 @@ export default function Header({ subtitle, title, centerTitle = false }) {
         </h1>
       )}
 
-      <button
-        type="button"
-        onClick={logout}
-        className="flex items-center justify-center gap-2 text-sm text-slate-600 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors min-w-[44px] min-h-[44px] shrink-0"
-        title="Logout"
-      >
-        <FiLogOut className="w-5 h-5" />
-        <span className="hidden md:inline font-medium">Logout</span>
-      </button>
+      <div className="flex items-center gap-1 shrink-0">
+        {actions}
+        <button
+          type="button"
+          onClick={logout}
+          className="flex items-center justify-center gap-2 text-sm text-slate-600 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors min-w-[44px] min-h-[44px]"
+          title="Logout"
+        >
+          <FiLogOut className="w-5 h-5" />
+          <span className="hidden md:inline font-medium">Logout</span>
+        </button>
+      </div>
     </header>
   );
 }

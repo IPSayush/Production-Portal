@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FiPlus } from 'react-icons/fi';
+import { FiPlus, FiSearch } from 'react-icons/fi';
 import Header from '../components/Header';
+import SearchPanel from '../components/SearchPanel';
 import SheetCard from '../components/SheetCard';
 import CreateSheetWizard from '../components/CreateSheetWizard';
 import DeleteModal from '../components/DeleteModal';
@@ -24,6 +25,7 @@ export default function ManagerHome() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [bgLoading, setBgLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     fetchSheets();
@@ -58,10 +60,23 @@ export default function ManagerHome() {
 
   const showSkeleton = initialLoad && loading;
 
+  const searchButton = (
+    <button
+      type="button"
+      onClick={() => setSearchOpen(true)}
+      className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+      title="Search by date"
+      aria-label="Search by date"
+    >
+      <FiSearch className="w-5 h-5" />
+    </button>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopProgressBar loading={bgLoading || (loading && !initialLoad)} />
-      <Header />
+      <Header actions={searchButton} />
+      <SearchPanel isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <main className="max-w-4xl mx-auto px-4 py-4 sm:py-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">

@@ -61,6 +61,7 @@ export const sheetsApi = {
     api.put(`/sheets/${sheetId}/rows/${rowId}`, data),
   deleteRow: (sheetId, rowId, password) =>
     api.delete(`/sheets/${sheetId}/rows/${rowId}`, { data: { password } }),
+  searchByDate: (date) => api.get('/sheets/search', { params: { date } }),
 };
 
 export default api;

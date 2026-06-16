@@ -31,6 +31,8 @@ const sheetSchema = new mongoose.Schema(
 );
 
 sheetSchema.index({ createdAt: -1 });
+sheetSchema.index({ updatedAt: -1 });
 sheetSchema.index({ status: 1 });
+sheetSchema.index({ 'rows.date': 1 });
 
 module.exports = mongoose.model('Sheet', sheetSchema);

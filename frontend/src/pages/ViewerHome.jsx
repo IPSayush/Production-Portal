@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiEye, FiClipboard } from 'react-icons/fi';
+import { FiEye, FiClipboard, FiSearch } from 'react-icons/fi';
 import Header from '../components/Header';
+import SearchPanel from '../components/SearchPanel';
 import SkeletonCard from '../components/SkeletonCard';
 import StatusBadge from '../components/StatusBadge';
 import { ProgressSummaryCompact } from '../components/ProgressSummary';
@@ -13,8 +14,8 @@ const FILTERS = ['All', 'Working', 'Completed', 'Upcoming'];
 export default function ViewerHome() {
   const navigate = useNavigate();
   const { sheets, loading, initialLoad, error, fetchSheets } = useSheets();
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [sortNewest, setSortNewest] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('Working');
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     fetchSheets();
@@ -26,12 +27,12 @@ export default function ViewerHome() {
       list = list.filter((s) => (s.status || 'Upcoming') === activeFilter);
     }
     list.sort((a, b) => {
-      const ta = new Date(a.createdAt).getTime();
-      const tb = new Date(b.createdAt).getTime();
-      return sortNewest ? tb - ta : ta - tb;
+      const ta = new Date(a.updatedAt || a.createdAt).getTime();
+      const tb = new Date(b.updatedAt || b.createdAt).getTime();
+      return tb - ta;
     });
     return list;
-  }, [sheets, activeFilter, sortNewest]);
+  }, [sheets, activeFilter]);
 
   const handleView = useCallback(
     (id) => {
@@ -44,9 +45,22 @@ export default function ViewerHome() {
   const emptyAll = !loading && sheets.length === 0;
   const emptyFilter = !loading && sheets.length > 0 && filteredSheets.length === 0;
 
+  const searchButton = (
+    <button
+      type="button"
+      onClick={() => setSearchOpen(true)}
+      className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+      title="Search by date"
+      aria-label="Search by date"
+    >
+      <FiSearch className="w-5 h-5" />
+    </button>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header title="📋 Production Sheets" centerTitle />
+      <Header title="📋 Production Sheets" centerTitle actions={searchButton} />
+      <SearchPanel isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <div className="max-w-2xl mx-auto px-4 py-3">
         <div className="flex flex-wrap gap-2 mb-4">
@@ -64,16 +78,6 @@ export default function ViewerHome() {
               {f}
             </button>
           ))}
-        </div>
-
-        <div className="flex justify-end mb-3">
-          <button
-            type="button"
-            onClick={() => setSortNewest((v) => !v)}
-            className="text-xs text-slate-600 hover:text-slate-800 px-2 py-1 min-h-[44px] sm:min-h-0"
-          >
-            {sortNewest ? 'Newest ↕ Oldest' : 'Oldest ↕ Newest'}
-          </button>
         </div>
 
         {error && (
@@ -107,7 +111,7 @@ export default function ViewerHome() {
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <StatusBadge status={sheet.status || 'Upcoming'} />
                   <span className="text-xs text-slate-500 shrink-0">
-                    {formatSheetDate(sheet.createdAt)}
+                    {formatSheetDate(sheet.updatedAt || sheet.createdAt)}
                   </span>
                 </div>
 

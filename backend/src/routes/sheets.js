@@ -70,7 +70,7 @@ router.get('/', async (req, res) => {
 
     const [sheets, totalCount] = await Promise.all([
       Sheet.find({}, sheetListProjection())
-        .sort({ createdAt: -1 })
+        .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -88,6 +88,67 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     console.error('Get sheets error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ─── GET search rows by date ───
+router.get('/search', async (req, res) => {
+  try {
+    const { date } = req.query;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res
+        .status(400)
+        .json({ message: 'Valid date query param required (YYYY-MM-DD)' });
+    }
+
+    const start = new Date(`${date}T00:00:00`);
+    const end = new Date(`${date}T23:59:59.999`);
+
+    const results = await Sheet.aggregate([
+      {
+        $match: {
+          'rows.date': { $gte: start, $lte: end },
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          status: 1,
+          description: 1,
+          customColumns: 1,
+          rows: {
+            $filter: {
+              input: '$rows',
+              as: 'row',
+              cond: {
+                $and: [
+                  { $gte: ['$$row.date', start] },
+                  { $lte: ['$$row.date', end] },
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          'rows.0': { $exists: true },
+        },
+      },
+    ]);
+
+    res.json(
+      results.map((sheet) => ({
+        sheetId: sheet._id,
+        sheetTitle: sheet.title,
+        status: sheet.status || 'Upcoming',
+        customColumns: sheet.customColumns || [],
+        matchingRows: sheet.rows,
+      }))
+    );
+  } catch (err) {
+    console.error('Search sheets by date error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -169,7 +230,7 @@ router.patch(
       const sheet = await Sheet.findByIdAndUpdate(
         req.params.id,
         { status },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true, timestamps: true }
       ).lean();
 
       if (!sheet) {

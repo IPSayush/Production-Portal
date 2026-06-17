@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiEye, FiClipboard, FiSearch } from 'react-icons/fi';
 import Header from '../components/Header';
 import SearchPanel from '../components/SearchPanel';
+import SheetCardImage from '../components/SheetCardImage';
 import SkeletonCard from '../components/SkeletonCard';
 import StatusBadge from '../components/StatusBadge';
 import { ProgressSummaryCompact } from '../components/ProgressSummary';
@@ -106,35 +107,39 @@ export default function ViewerHome() {
             {filteredSheets.map((sheet) => (
               <article
                 key={sheet._id}
-                className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm"
+                className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm"
               >
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <StatusBadge status={sheet.status || 'Upcoming'} />
-                  <span className="text-xs text-slate-500 shrink-0">
-                    {formatSheetDate(sheet.updatedAt || sheet.createdAt)}
-                  </span>
+                <SheetCardImage imageUrl={sheet.imageUrl} title={sheet.title} />
+
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <StatusBadge status={sheet.status || 'Upcoming'} />
+                    <span className="text-xs text-slate-500 shrink-0">
+                      {formatSheetDate(sheet.updatedAt || sheet.createdAt)}
+                    </span>
+                  </div>
+
+                  <h2 className="font-bold text-base text-slate-800">{sheet.title}</h2>
+                  {sheet.description ? (
+                    <p className="text-xs text-gray-500 italic mt-1 truncate">
+                      {sheet.description}
+                    </p>
+                  ) : null}
+
+                  <ProgressSummaryCompact
+                    targetQuantity={sheet.targetQuantity}
+                    achievedQuantity={sheet.achievedQuantity}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => handleView(sheet._id)}
+                    className="mt-4 w-full flex items-center justify-center gap-2 bg-slate-700 text-white py-3 rounded-lg text-sm font-medium hover:bg-slate-800 min-h-[44px]"
+                  >
+                    <FiEye className="w-5 h-5" />
+                    View Sheet →
+                  </button>
                 </div>
-
-                <h2 className="font-bold text-base text-slate-800">{sheet.title}</h2>
-                {sheet.description ? (
-                  <p className="text-xs text-gray-500 italic mt-1 truncate">
-                    {sheet.description}
-                  </p>
-                ) : null}
-
-                <ProgressSummaryCompact
-                  targetQuantity={sheet.targetQuantity}
-                  achievedQuantity={sheet.achievedQuantity}
-                />
-
-                <button
-                  type="button"
-                  onClick={() => handleView(sheet._id)}
-                  className="mt-4 w-full flex items-center justify-center gap-2 bg-slate-700 text-white py-3 rounded-lg text-sm font-medium hover:bg-slate-800 min-h-[44px]"
-                >
-                  <FiEye className="w-5 h-5" />
-                  View Sheet →
-                </button>
               </article>
             ))}
           </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiX } from 'react-icons/fi';
 import { sheetsApi } from '../api';
+import ImageUploadInput from './ImageUploadInput';
 
 function getColumnLetters(count) {
   const letters = [];
@@ -19,6 +20,8 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
   const [targetQuantity, setTargetQuantity] = useState('');
   const [columnCount, setColumnCount] = useState(0);
   const [columnNames, setColumnNames] = useState({});
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -36,6 +39,8 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
     setTargetQuantity('');
     setColumnCount(0);
     setColumnNames({});
+    setImageUrl('');
+    setImageUploading(false);
     setError('');
     setSuccess(false);
   };
@@ -57,6 +62,7 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
       const payload = {
         title: title.trim(),
         description: description.trim(),
+        imageUrl: imageUrl || '',
         customColumns,
       };
       if (targetQuantity !== '' && targetQuantity != null) {
@@ -136,11 +142,31 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 mb-1 resize-none"
           />
           <p className="text-xs text-gray-400 mb-4 text-right">{descLen} / 300</p>
+
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Sheet Image <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <div className="mb-4">
+            <ImageUploadInput
+              value={imageUrl}
+              onChange={setImageUrl}
+              disabled={loading}
+              onUploadingChange={setImageUploading}
+            />
+          </div>
+
+          {imageUploading && (
+            <p className="text-xs text-gray-500 mb-3 text-center">
+              Please wait for image to upload
+            </p>
+          )}
+
           <button
             type="button"
             onClick={() => setStep(2)}
-            disabled={!title.trim()}
+            disabled={!title.trim() || imageUploading}
             className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg hover:bg-slate-800 text-sm font-medium disabled:opacity-50 min-h-[44px]"
+            title={imageUploading ? 'Please wait for image to upload' : undefined}
           >
             Next →
           </button>

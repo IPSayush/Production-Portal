@@ -6,10 +6,11 @@ import {
   useRef,
 } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiPlus, FiSave, FiEdit2, FiCheck, FiX } from 'react-icons/fi';
+import { FiArrowLeft, FiPlus, FiSave, FiEdit2, FiCheck, FiX, FiCamera } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/DataTable';
 import DeleteModal from '../components/DeleteModal';
+import ImageUploadInput from '../components/ImageUploadInput';
 import LoadingSpinner from '../components/LoadingSpinner';
 import TopProgressBar from '../components/TopProgressBar';
 import StatusBadge from '../components/StatusBadge';
@@ -40,6 +41,7 @@ export default function SheetDetail() {
   const [customColumns, setCustomColumns] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [status, setStatus] = useState('Upcoming');
   const [loading, setLoading] = useState(true);
   const [bgLoading, setBgLoading] = useState(false);
@@ -50,6 +52,10 @@ export default function SheetDetail() {
   const [deleteRowTarget, setDeleteRowTarget] = useState(null);
   const [editingDescription, setEditingDescription] = useState(false);
   const [editDescription, setEditDescription] = useState('');
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);
 
   const dirtyDebounceRef = useRef(null);
   const homePath = role === 'manager' ? '/manager/home' : '/viewer/home';
@@ -71,6 +77,7 @@ export default function SheetDetail() {
       setTitle(data.title);
       setDescription(data.description || '');
       setEditDescription(data.description || '');
+      setImageUrl(data.imageUrl || '');
       setStatus(data.status || 'Upcoming');
       setCustomColumns(data.customColumns || []);
       setRows(normalizeRows(data.rows));
@@ -79,6 +86,7 @@ export default function SheetDetail() {
         _id: data._id,
         title: data.title,
         description: data.description || '',
+        imageUrl: data.imageUrl || '',
         status: data.status || 'Upcoming',
         targetQuantity: data.targetQuantity ?? 0,
         achievedQuantity: data.achievedQuantity ?? calculateQuantityTotal(data.rows),
@@ -162,6 +170,55 @@ export default function SheetDetail() {
     },
     [id, status, updateSheetInCache]
   );
+
+  const openImageModal = () => {
+    setEditImageUrl(imageUrl);
+    setImageModalOpen(true);
+  };
+
+  const closeImageModal = () => {
+    setImageModalOpen(false);
+    setEditImageUrl('');
+    setImageUploading(false);
+  };
+
+  const handleSaveImage = async () => {
+    if (imageUploading) return;
+    setSavingImage(true);
+    setBgLoading(true);
+    try {
+      await sheetsApi.update(id, { imageUrl: editImageUrl || '' });
+      setImageUrl(editImageUrl || '');
+      setSheet((s) => ({ ...s, imageUrl: editImageUrl || '' }));
+      updateSheetInCache({ _id: id, imageUrl: editImageUrl || '' });
+      closeImageModal();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update image');
+    } finally {
+      setSavingImage(false);
+      setBgLoading(false);
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    const confirmed = window.confirm('Remove the current sheet image?');
+    if (!confirmed) return;
+    setSavingImage(true);
+    setBgLoading(true);
+    try {
+      await sheetsApi.update(id, { imageUrl: '' });
+      setImageUrl('');
+      setEditImageUrl('');
+      setSheet((s) => ({ ...s, imageUrl: '' }));
+      updateSheetInCache({ _id: id, imageUrl: '' });
+      closeImageModal();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove image');
+    } finally {
+      setSavingImage(false);
+      setBgLoading(false);
+    }
+  };
 
   const handleSaveDescription = async () => {
     const trimmed = editDescription.trim().slice(0, 300);
@@ -294,6 +351,16 @@ export default function SheetDetail() {
         )}
       </div>
 
+      {imageUrl ? (
+        <div className="w-full h-40 md:h-48 lg:h-56 overflow-hidden bg-gray-100">
+          <img
+            src={imageUrl}
+            alt={title}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : null}
+
       <div className="px-4 pt-4 space-y-3 max-w-5xl mx-auto">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -305,6 +372,16 @@ export default function SheetDetail() {
               editable={isManager}
               onChange={isManager ? handleStatusChange : undefined}
             />
+            {isManager && (
+              <button
+                type="button"
+                onClick={openImageModal}
+                className="text-xs text-slate-600 underline flex items-center gap-1 ml-auto sm:ml-0"
+              >
+                <FiCamera className="w-3.5 h-3.5" />
+                Change Image
+              </button>
+            )}
           </div>
           {editingDescription && isManager ? (
             <div className="mt-2">
@@ -419,6 +496,48 @@ export default function SheetDetail() {
         onConfirm={handleDeleteRow}
         itemType="row"
       />
+
+      {imageModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Update Sheet Image</h2>
+            <ImageUploadInput
+              value={editImageUrl}
+              onChange={setEditImageUrl}
+              disabled={savingImage}
+              onUploadingChange={setImageUploading}
+            />
+            {imageUrl ? (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                disabled={savingImage || imageUploading}
+                className="text-xs text-red-500 hover:text-red-600 mt-3 underline disabled:opacity-50"
+              >
+                Remove current image
+              </button>
+            ) : null}
+            <div className="flex gap-2 mt-5">
+              <button
+                type="button"
+                onClick={closeImageModal}
+                disabled={savingImage}
+                className="flex-1 border border-gray-300 text-gray-600 px-4 py-2.5 rounded-lg text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveImage}
+                disabled={savingImage || imageUploading}
+                className="flex-1 bg-slate-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
+              >
+                {savingImage ? 'Saving...' : 'Save Image'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

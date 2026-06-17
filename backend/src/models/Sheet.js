@@ -16,6 +16,7 @@ const sheetSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '', maxlength: 300 },
+    imageUrl: { type: String, default: '' },
     status: {
       type: String,
       enum: ['Working', 'Completed', 'Upcoming'],

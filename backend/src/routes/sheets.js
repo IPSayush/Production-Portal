@@ -51,6 +51,7 @@ function toListItem(sheet) {
     _id: sheet._id,
     title: sheet.title,
     description: sheet.description || '',
+    imageUrl: sheet.imageUrl || '',
     status: sheet.status || 'Upcoming',
     customColumns: sheet.customColumns,
     targetQuantity: sheet.targetQuantity ?? 0,
@@ -156,7 +157,7 @@ router.get('/search', async (req, res) => {
 // ─── POST create sheet ───
 router.post('/', requireManager, validateSheetBody, async (req, res) => {
   try {
-    const { title, description, customColumns, targetQuantity } = req.body;
+    const { title, description, imageUrl, customColumns, targetQuantity } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ message: 'Sheet title is required' });
@@ -165,6 +166,7 @@ router.post('/', requireManager, validateSheetBody, async (req, res) => {
     const sheet = await Sheet.create({
       title: title.trim(),
       description: description ? String(description).trim().slice(0, 300) : '',
+      imageUrl: imageUrl ? String(imageUrl).trim() : '',
       customColumns: customColumns || [],
       targetQuantity:
         targetQuantity != null && targetQuantity !== ''
@@ -253,7 +255,7 @@ router.put(
   validateSheetBody,
   async (req, res) => {
     try {
-      const { title, description, customColumns } = req.body;
+      const { title, description, imageUrl, customColumns } = req.body;
       const sheet = await Sheet.findById(req.params.id);
       if (!sheet) {
         return res.status(404).json({ message: 'Sheet not found' });
@@ -264,6 +266,9 @@ router.put(
       }
       if (description !== undefined) {
         sheet.description = String(description).trim().slice(0, 300);
+      }
+      if (imageUrl !== undefined) {
+        sheet.imageUrl = imageUrl ? String(imageUrl).trim() : '';
       }
       if (customColumns !== undefined) {
         sheet.customColumns = customColumns;

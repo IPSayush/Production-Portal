@@ -30,6 +30,37 @@ async function verifyManagerPassword(userId, password) {
 }
 
 /**
+ * Store row dates at UTC noon for the calendar day (YYYY-MM-DD).
+ * Accepts ISO strings or date-only strings from the client.
+ */
+function normalizeRowDate(dateInput) {
+  if (!dateInput) {
+    const now = new Date();
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0));
+  }
+
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    const [y, m, d] = dateInput.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
+  }
+
+  const parsed = new Date(dateInput);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date();
+  }
+
+  return new Date(
+    Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate(), 12, 0, 0, 0)
+  );
+}
+
+function sanitizeTimezone(tz) {
+  if (typeof tz !== 'string' || !tz.trim()) return 'UTC';
+  if (!/^[A-Za-z0-9_+\/-]+$/.test(tz.trim())) return 'UTC';
+  return tz.trim();
+}
+
+/**
  * Recalculate achievedQuantity and rowCount from actual rows.
  * This prevents drift from crashes or race conditions.
  */
@@ -96,36 +127,32 @@ router.get('/', async (req, res) => {
 // ─── GET search rows by date ───
 router.get('/search', async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, tz } = req.query;
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res
         .status(400)
         .json({ message: 'Valid date query param required (YYYY-MM-DD)' });
     }
 
-    const start = new Date(`${date}T00:00:00`);
-    const end = new Date(`${date}T23:59:59.999`);
+    const timezone = sanitizeTimezone(tz);
 
     const results = await Sheet.aggregate([
       {
-        $match: {
-          'rows.date': { $gte: start, $lte: end },
-        },
-      },
-      {
-        $project: {
-          title: 1,
-          status: 1,
-          description: 1,
-          customColumns: 1,
-          rows: {
+        $addFields: {
+          matchingRows: {
             $filter: {
               input: '$rows',
               as: 'row',
               cond: {
-                $and: [
-                  { $gte: ['$$row.date', start] },
-                  { $lte: ['$$row.date', end] },
+                $eq: [
+                  {
+                    $dateToString: {
+                      format: '%Y-%m-%d',
+                      date: '$$row.date',
+                      timezone,
+                    },
+                  },
+                  date,
                 ],
               },
             },
@@ -134,7 +161,16 @@ router.get('/search', async (req, res) => {
       },
       {
         $match: {
-          'rows.0': { $exists: true },
+          'matchingRows.0': { $exists: true },
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          status: 1,
+          description: 1,
+          customColumns: 1,
+          rows: '$matchingRows',
         },
       },
     ]);
@@ -335,7 +371,7 @@ router.post(
       const qty = quantity != null ? Number(quantity) : 0;
 
       sheet.rows.push({
-        date: date ? new Date(date) : new Date(),
+        date: normalizeRowDate(date),
         quantity: qty,
         description: description || '',
         customValues: customMap,
@@ -373,7 +409,7 @@ router.put(
         return res.status(404).json({ message: 'Row not found' });
       }
 
-      if (date !== undefined) row.date = new Date(date);
+      if (date !== undefined) row.date = normalizeRowDate(date);
       if (quantity !== undefined) row.quantity = Number(quantity);
       if (description !== undefined) row.description = description;
 

@@ -16,7 +16,7 @@ import TopProgressBar from '../components/TopProgressBar';
 import StatusBadge from '../components/StatusBadge';
 import { ProgressSummaryFull } from '../components/ProgressSummary';
 import { sheetsApi } from '../api';
-import { calculateQuantityTotal, formatQuantityTotal } from '../utils/quantityUtils';
+import { formatInputDate } from '../utils/dateUtils';
 import { useSheets } from '../context/SheetsContext';
 
 function normalizeRows(rows) {
@@ -143,7 +143,7 @@ export default function SheetDetail() {
   const handleAddRow = useCallback(() => {
     const newRow = {
       _tempId: `temp-${Date.now()}`,
-      date: new Date().toISOString(),
+      date: formatInputDate(new Date()),
       quantity: 0,
       description: '',
       customValues: {},
@@ -252,7 +252,7 @@ export default function SheetDetail() {
 
       for (const row of rows) {
         const payload = {
-          date: row.date,
+          date: formatInputDate(row.date),
           quantity: row.quantity,
           description: row.description || '',
           customValues: row.customValues || {},

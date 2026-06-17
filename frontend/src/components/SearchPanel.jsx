@@ -48,6 +48,14 @@ function formatCustomValues(row, customColumns) {
     .join('  •  ');
 }
 
+function getClientTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
 function SearchPanelContent({ onClose, searchDate, setSearchDate, quickSelect, setQuickSelect, searchResults, searching, onSearch }) {
   const handleDateChange = (value) => {
     setSearchDate(value);
@@ -212,7 +220,7 @@ export default function SearchPanel({ isOpen, onClose }) {
     setSearching(true);
     setSearchResults(null);
     try {
-      const res = await sheetsApi.searchByDate(dateStr);
+      const res = await sheetsApi.searchByDate(dateStr, getClientTimezone());
       setSearchResults(res.data);
     } catch {
       setSearchResults([]);

@@ -17,6 +17,7 @@ import StatusBadge from '../components/StatusBadge';
 import { ProgressSummaryFull } from '../components/ProgressSummary';
 import { sheetsApi } from '../api';
 import { formatInputDate } from '../utils/dateUtils';
+import { calculateQuantityTotal, formatQuantityTotal } from '../utils/quantityUtils';
 import { useSheets } from '../context/SheetsContext';
 
 function normalizeRows(rows) {

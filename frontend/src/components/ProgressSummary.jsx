@@ -46,7 +46,7 @@ export function ProgressSummaryCompact({ targetQuantity, achievedQuantity }) {
   if (target <= 0) {
     return (
       <div className="mt-2">
-        <p className="text-xs text-slate-600">✅ Achieved: {formatUnits(achieved)} units</p>
+        <p className="text-xs text-slate-600">✅ Achieved: {formatUnits(achieved)} piece</p>
       </div>
     );
   }
@@ -54,7 +54,7 @@ export function ProgressSummaryCompact({ targetQuantity, achievedQuantity }) {
   return (
     <div className="mt-2">
       <p className="text-xs text-slate-600">
-         {formatUnits(achieved)} / {formatUnits(target)} units ({Math.round(percent)}%)
+         {formatUnits(target)} / {formatUnits(achieved)} piece ({Math.round(percent)}%)
       </p>
       <ProgressBarTrack percent={percent} />
     </div>

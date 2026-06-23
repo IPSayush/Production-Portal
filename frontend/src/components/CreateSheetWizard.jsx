@@ -180,7 +180,7 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
               Set Target Quantity
             </label>
             <p className="text-xs text-gray-500 mb-2">
-              Total units to be produced for this sheet
+              Total piece to be produced for this sheet
             </p>
             <input
               type="number"

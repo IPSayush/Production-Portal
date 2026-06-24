@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FiPlus, FiSearch } from 'react-icons/fi';
 import Header from '../components/Header';
 import SearchPanel from '../components/SearchPanel';
@@ -9,6 +9,8 @@ import SkeletonCard from '../components/SkeletonCard';
 import TopProgressBar from '../components/TopProgressBar';
 import { sheetsApi } from '../api';
 import { useSheets } from '../context/SheetsContext';
+
+const FILTERS = ['All', 'Working', 'Completed', 'Upcoming'];
 
 export default function ManagerHome() {
   const {
@@ -26,10 +28,24 @@ export default function ManagerHome() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [bgLoading, setBgLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('All');
 
   useEffect(() => {
     fetchSheets();
   }, [fetchSheets]);
+
+  const filteredSheets = useMemo(() => {
+    let list = [...sheets];
+    if (activeFilter !== 'All') {
+      list = list.filter((s) => (s.status || 'Upcoming') === activeFilter);
+    }
+    list.sort((a, b) => {
+      const ta = new Date(a.updatedAt || a.createdAt).getTime();
+      const tb = new Date(b.updatedAt || b.createdAt).getTime();
+      return tb - ta;
+    });
+    return list;
+  }, [sheets, activeFilter]);
 
   const handleDeleteSheet = useCallback(async (password) => {
     setBgLoading(true);
@@ -59,6 +75,8 @@ export default function ManagerHome() {
   }, [invalidateCache, fetchSheets]);
 
   const showSkeleton = initialLoad && loading;
+  const emptyAll = !loading && sheets.length === 0;
+  const emptyFilter = !loading && sheets.length > 0 && filteredSheets.length === 0;
 
   const searchButton = (
     <button
@@ -90,6 +108,23 @@ export default function ManagerHome() {
           </button>
         </div>
 
+        <div className="flex flex-wrap gap-2 mb-4">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setActiveFilter(f)}
+              className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium min-h-[44px] sm:min-h-0 transition-colors ${
+                activeFilter === f
+                  ? 'bg-slate-700 text-white'
+                  : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
         {error && (
           <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-4">
             {error}
@@ -102,13 +137,17 @@ export default function ManagerHome() {
             <SkeletonCard />
             <SkeletonCard />
           </div>
-        ) : sheets.length === 0 ? (
+        ) : emptyAll ? (
           <p className="text-center text-gray-500 py-12 text-sm sm:text-base">
             No sheets yet. Create your first sheet.
           </p>
+        ) : emptyFilter ? (
+          <p className="text-center text-gray-500 py-12 text-sm sm:text-base">
+            No {activeFilter} sheets found.
+          </p>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {sheets.map((sheet) => (
+            {filteredSheets.map((sheet) => (
               <SheetCard
                 key={sheet._id}
                 sheet={sheet}

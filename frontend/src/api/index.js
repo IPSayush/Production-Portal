@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://demo-production-portal.vercel.app/api',
   timeout: 15000,
   withCredentials: false,
   headers: { 'Content-Type': 'application/json' },

@@ -16,7 +16,8 @@ const corsOptions = {
     'http://localhost:4173',
     'https://production-portal-tttt.pages.dev',
     'https://test-portal-64d.pages.dev',
-    'https://production-portal-e77.pages.dev'
+    'https://production-portal-e77.pages.dev',
+    'https://demo-production-portal.pages.dev/'
   ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

@@ -20,7 +20,7 @@ function validateObjectId(...paramNames) {
  * Validate sheet creation/update body fields.
  */
 function validateSheetBody(req, res, next) {
-  const { title, description, customColumns, targetQuantity } = req.body;
+  const { title, description } = req.body;
 
   // Title validation (required on creation, optional on update)
   if (title !== undefined) {
@@ -42,19 +42,44 @@ function validateSheetBody(req, res, next) {
     }
   }
 
-  // Custom columns validation
-  if (customColumns !== undefined) {
-    if (!Array.isArray(customColumns)) {
-      return res.status(400).json({ message: 'customColumns must be an array' });
+  next();
+}
+
+/**
+ * Validate item creation/update body fields.
+ */
+function validateItemBody(req, res, next) {
+  const { name, size, quality, workerColumns, targetQuantity } = req.body;
+
+  // Name validation
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ message: 'Item name is required and must be a non-empty string' });
     }
-    for (let i = 0; i < customColumns.length; i++) {
-      if (typeof customColumns[i] !== 'string' || !customColumns[i].trim()) {
-        return res.status(400).json({ message: `customColumns[${i}] must be a non-empty string` });
+    if (name.trim().length > 200) {
+      return res.status(400).json({ message: 'Item name must be 200 characters or less' });
+    }
+  }
+
+  // Size validation
+  if (size !== undefined && typeof size !== 'string') {
+    return res.status(400).json({ message: 'Size must be a string' });
+  }
+
+  // Quality validation
+  if (quality !== undefined && typeof quality !== 'string') {
+    return res.status(400).json({ message: 'Quality must be a string' });
+  }
+
+  // Worker columns validation
+  if (workerColumns !== undefined) {
+    if (!Array.isArray(workerColumns)) {
+      return res.status(400).json({ message: 'workerColumns must be an array' });
+    }
+    for (let i = 0; i < workerColumns.length; i++) {
+      if (typeof workerColumns[i] !== 'string' || !workerColumns[i].trim()) {
+        return res.status(400).json({ message: `workerColumns[${i}] must be a non-empty string` });
       }
-    }
-    const unique = new Set(customColumns.map((c) => c.trim().toLowerCase()));
-    if (unique.size !== customColumns.length) {
-      return res.status(400).json({ message: 'customColumns must not contain duplicates' });
     }
   }
 
@@ -73,7 +98,7 @@ function validateSheetBody(req, res, next) {
  * Validate row creation/update body fields.
  */
 function validateRowBody(req, res, next) {
-  const { date, quantity, description, customValues } = req.body;
+  const { date, quantity, description, workerValues } = req.body;
 
   // Date validation
   if (date !== undefined) {
@@ -96,17 +121,17 @@ function validateRowBody(req, res, next) {
     return res.status(400).json({ message: 'Description must be a string' });
   }
 
-  // Custom values validation
-  if (customValues !== undefined && customValues !== null) {
-    if (typeof customValues !== 'object' || Array.isArray(customValues)) {
-      return res.status(400).json({ message: 'customValues must be an object' });
+  // Worker values validation
+  if (workerValues !== undefined && workerValues !== null) {
+    if (typeof workerValues !== 'object' || Array.isArray(workerValues)) {
+      return res.status(400).json({ message: 'workerValues must be an object' });
     }
-    for (const [key, value] of Object.entries(customValues)) {
+    for (const [key, value] of Object.entries(workerValues)) {
       if (typeof key !== 'string') {
-        return res.status(400).json({ message: 'customValues keys must be strings' });
+        return res.status(400).json({ message: 'workerValues keys must be strings' });
       }
       if (value !== null && value !== undefined && typeof value !== 'string' && typeof value !== 'number') {
-        return res.status(400).json({ message: 'customValues values must be strings or numbers' });
+        return res.status(400).json({ message: 'workerValues values must be strings or numbers' });
       }
     }
   }
@@ -159,6 +184,7 @@ function validatePasswordBody(req, res, next) {
 module.exports = {
   validateObjectId,
   validateSheetBody,
+  validateItemBody,
   validateRowBody,
   validateLoginBody,
   validateStatus,

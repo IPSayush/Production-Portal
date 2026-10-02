@@ -6,12 +6,12 @@ import {
   FiTrash2,
   FiCheck,
   FiX,
+  FiPackage,
 } from 'react-icons/fi';
 import { formatSheetDate } from '../utils/dateUtils';
 import { sheetsApi } from '../api';
 import StatusBadge from './StatusBadge';
 import SheetCardImage from './SheetCardImage';
-import { ProgressSummaryCompact } from './ProgressSummary';
 
 function ManagerSheetCard({ sheet, onDelete, onUpdate }) {
   const navigate = useNavigate();
@@ -24,8 +24,13 @@ function ManagerSheetCard({ sheet, onDelete, onUpdate }) {
     setStatus(sheet.status || 'Upcoming');
   }, [sheet.status]);
 
-  const rowLabel =
-    sheet.rowCount === 1 ? '1 entry' : `${sheet.rowCount || 0} entries`;
+  const totalItems = sheet.totalItems || 0;
+  const completedItems = sheet.completedItems || 0;
+  const totalTarget = sheet.totalTarget || 0;
+  const totalAchieved = sheet.totalAchieved || 0;
+  const progressPct = totalTarget > 0
+    ? Math.min(100, Math.round((totalAchieved / totalTarget) * 100))
+    : 0;
 
   const handleSaveTitle = async () => {
     if (!editTitle.trim() || editTitle.trim() === sheet.title) {
@@ -114,12 +119,25 @@ function ManagerSheetCard({ sheet, onDelete, onUpdate }) {
           <p className="text-xs text-gray-500 truncate mb-2">{sheet.description}</p>
         ) : null}
 
-        <ProgressSummaryCompact
-          targetQuantity={sheet.targetQuantity}
-          achievedQuantity={sheet.achievedQuantity}
-        />
-
-        <p className="text-xs text-slate-500 mt-2">{rowLabel}</p>
+        {/* Items & Progress */}
+        <div className="mb-2">
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+            <span className="flex items-center gap-1">
+              <FiPackage className="w-3.5 h-3.5" />
+              {completedItems}/{totalItems} items
+            </span>
+            <span className="font-medium text-slate-700">
+              {totalAchieved.toLocaleString('en-IN')}/{totalTarget.toLocaleString('en-IN')} pcs
+            </span>
+          </div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-slate-700 rounded-full transition-all"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-gray-400 mt-0.5 text-right">{progressPct}%</p>
+        </div>
 
         <div className="border-t border-slate-100 mt-3 pt-3 flex flex-wrap items-center justify-center sm:justify-end gap-1">
           <button
@@ -169,9 +187,10 @@ const SheetCard = memo(
     prev.sheet.description === next.sheet.description &&
     prev.sheet.imageUrl === next.sheet.imageUrl &&
     prev.sheet.status === next.sheet.status &&
-    prev.sheet.rowCount === next.sheet.rowCount &&
-    prev.sheet.targetQuantity === next.sheet.targetQuantity &&
-    prev.sheet.achievedQuantity === next.sheet.achievedQuantity
+    prev.sheet.totalItems === next.sheet.totalItems &&
+    prev.sheet.completedItems === next.sheet.completedItems &&
+    prev.sheet.totalTarget === next.sheet.totalTarget &&
+    prev.sheet.totalAchieved === next.sheet.totalAchieved
 );
 
 export default SheetCard;

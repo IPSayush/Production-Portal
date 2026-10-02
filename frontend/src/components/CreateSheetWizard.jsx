@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiX } from 'react-icons/fi';
+import { FiX, FiPlus, FiTrash2, FiImage } from 'react-icons/fi';
 import { sheetsApi } from '../api';
 import ImageUploadInput from './ImageUploadInput';
 
-function getColumnLetters(count) {
-  const letters = [];
-  for (let i = 0; i < count; i++) {
-    letters.push(String.fromCharCode(65 + i));
-  }
-  return letters;
+function emptyItem() {
+  return {
+    _tempId: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: '',
+    imageUrl: '',
+    size: '',
+    quality: '',
+    workerColumns: [],
+    targetQuantity: '',
+    _workerCount: 0,
+    _workerNames: {},
+  };
 }
 
 export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
@@ -17,18 +23,15 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [targetQuantity, setTargetQuantity] = useState('');
-  const [columnCount, setColumnCount] = useState(0);
-  const [columnNames, setColumnNames] = useState({});
   const [imageUrl, setImageUrl] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
+  const [items, setItems] = useState([emptyItem()]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
 
-  const letters = getColumnLetters(columnCount);
   const progress = step === 1 ? 50 : 100;
   const descLen = description.length;
 
@@ -36,11 +39,9 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
     setStep(1);
     setTitle('');
     setDescription('');
-    setTargetQuantity('');
-    setColumnCount(0);
-    setColumnNames({});
     setImageUrl('');
     setImageUploading(false);
+    setItems([emptyItem()]);
     setError('');
     setSuccess(false);
   };
@@ -50,24 +51,75 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
     onClose();
   };
 
+  const updateItem = (index, field, value) => {
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const addItem = () => {
+    setItems((prev) => [...prev, emptyItem()]);
+  };
+
+  const removeItem = (index) => {
+    if (items.length <= 1) return;
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateWorkerCount = (index, count) => {
+    const clamped = Math.min(20, Math.max(0, count));
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, _workerCount: clamped } : item))
+    );
+  };
+
+  const updateWorkerName = (itemIndex, workerIndex, name) => {
+    setItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== itemIndex) return item;
+        return {
+          ...item,
+          _workerNames: { ...item._workerNames, [workerIndex]: name },
+        };
+      })
+    );
+  };
+
   const handleCreate = async () => {
     setLoading(true);
     setError('');
     try {
-      const customColumns = letters.map((letter) => {
-        const custom = columnNames[letter]?.trim();
-        return custom || letter;
-      });
+      // Build items payload
+      const itemsPayload = items
+        .filter((item) => item.name.trim())
+        .map((item) => {
+          const workerColumns = [];
+          for (let w = 0; w < item._workerCount; w++) {
+            const name = item._workerNames[w]?.trim();
+            workerColumns.push(name || `Worker ${w + 1}`);
+          }
+          return {
+            name: item.name.trim(),
+            imageUrl: item.imageUrl || '',
+            size: item.size || '',
+            quality: item.quality || '',
+            workerColumns,
+            targetQuantity: item.targetQuantity !== '' ? Number(item.targetQuantity) || 0 : 0,
+          };
+        });
+
+      if (itemsPayload.length === 0) {
+        setError('Please add at least one item with a name');
+        setLoading(false);
+        return;
+      }
 
       const payload = {
         title: title.trim(),
         description: description.trim(),
         imageUrl: imageUrl || '',
-        customColumns,
+        items: itemsPayload,
       };
-      if (targetQuantity !== '' && targetQuantity != null) {
-        payload.targetQuantity = Math.max(0, Number(targetQuantity) || 0);
-      }
 
       const res = await sheetsApi.create(payload);
       setSuccess(true);
@@ -168,79 +220,135 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
             className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg hover:bg-slate-800 text-sm font-medium disabled:opacity-50 min-h-[44px]"
             title={imageUploading ? 'Please wait for image to upload' : undefined}
           >
-            Next →
+            Next → Add Items
           </button>
         </div>
       )}
 
       {step === 2 && (
         <div>
-          <section className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Set Target Quantity
-            </label>
-            <p className="text-xs text-gray-500 mb-2">
-              Total piece to be produced for this sheet
-            </p>
-            <input
-              type="number"
-              min={0}
-              value={targetQuantity}
-              onChange={(e) => setTargetQuantity(e.target.value)}
-              placeholder="e.g. 5000"
-              className="w-full border border-gray-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[44px]"
-            />
-          </section>
+          <p className="text-sm text-gray-600 mb-4">
+            Add items/products to this sheet. Each item can have its own photo, size, quality, target quantity, and worker columns.
+          </p>
 
-          <hr className="border-gray-200 mb-6" />
-
-          <section>
-            <p className="text-sm text-gray-600 mb-3">
-              Fixed columns: Date, Quantity, Description (auto-added)
-            </p>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              How many additional columns? (A, B, C...)
-            </label>
-            <div className="flex items-center gap-3 mb-4">
-              <button
-                type="button"
-                onClick={() => setColumnCount(Math.max(0, columnCount - 1))}
-                className="border border-gray-300 text-gray-600 w-11 h-11 rounded-lg hover:bg-gray-50 text-lg min-w-[44px] min-h-[44px]"
+          <div className="space-y-4 mb-4">
+            {items.map((item, idx) => (
+              <div
+                key={item._tempId}
+                className="border border-gray-200 rounded-lg p-4 relative bg-gray-50"
               >
-                −
-              </button>
-              <span className="text-lg font-medium w-8 text-center">{columnCount}</span>
-              <button
-                type="button"
-                onClick={() => setColumnCount(Math.min(26, columnCount + 1))}
-                className="border border-gray-300 text-gray-600 w-11 h-11 rounded-lg hover:bg-gray-50 text-lg min-w-[44px] min-h-[44px]"
-              >
-                +
-              </button>
-            </div>
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeItem(idx)}
+                    className="absolute top-2 right-2 text-gray-400 hover:text-red-500 p-1"
+                    title="Remove item"
+                  >
+                    <FiTrash2 className="w-4 h-4" />
+                  </button>
+                )}
 
-            {letters.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm text-gray-500 mb-2">Preview: {letters.join(' ')}</p>
-                <div className="space-y-2">
-                  {letters.map((letter) => (
-                    <div key={letter} className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-600 w-6">{letter}</span>
-                      <input
-                        type="text"
-                        placeholder={`Rename "${letter}" (optional)`}
-                        value={columnNames[letter] || ''}
-                        onChange={(e) =>
-                          setColumnNames({ ...columnNames, [letter]: e.target.value })
-                        }
-                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[44px]"
-                      />
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                  Item #{idx + 1}
+                </p>
+
+                {/* Item Name */}
+                <input
+                  type="text"
+                  value={item.name}
+                  onChange={(e) => updateItem(idx, 'name', e.target.value)}
+                  placeholder="Item name *"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 mb-2 min-h-[44px] bg-white"
+                />
+
+                {/* Item Image */}
+                <div className="mb-2">
+                  <ImageUploadInput
+                    value={item.imageUrl}
+                    onChange={(url) => updateItem(idx, 'imageUrl', url)}
+                    disabled={loading}
+                    compact
+                  />
+                </div>
+
+                {/* Size & Quality */}
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={item.size}
+                    onChange={(e) => updateItem(idx, 'size', e.target.value)}
+                    placeholder="Size (e.g. L, XL)"
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[44px] bg-white"
+                  />
+                  <input
+                    type="text"
+                    value={item.quality}
+                    onChange={(e) => updateItem(idx, 'quality', e.target.value)}
+                    placeholder="Quality"
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[44px] bg-white"
+                  />
+                </div>
+
+                {/* Target Quantity */}
+                <input
+                  type="number"
+                  min={0}
+                  value={item.targetQuantity}
+                  onChange={(e) => updateItem(idx, 'targetQuantity', e.target.value)}
+                  placeholder="Target Quantity (e.g. 5000)"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 mb-2 min-h-[44px] bg-white"
+                />
+
+                {/* Worker Columns */}
+                <div className="mt-2">
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">
+                    Worker Columns
+                  </label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => updateWorkerCount(idx, item._workerCount - 1)}
+                      className="border border-gray-300 text-gray-600 w-9 h-9 rounded-lg hover:bg-gray-100 text-base min-w-[36px] min-h-[36px]"
+                    >
+                      −
+                    </button>
+                    <span className="text-sm font-medium w-6 text-center">
+                      {item._workerCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => updateWorkerCount(idx, item._workerCount + 1)}
+                      className="border border-gray-300 text-gray-600 w-9 h-9 rounded-lg hover:bg-gray-100 text-base min-w-[36px] min-h-[36px]"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {item._workerCount > 0 && (
+                    <div className="space-y-1">
+                      {Array.from({ length: item._workerCount }).map((_, wi) => (
+                        <input
+                          key={wi}
+                          type="text"
+                          placeholder={`Worker ${wi + 1} name`}
+                          value={item._workerNames[wi] || ''}
+                          onChange={(e) => updateWorkerName(idx, wi, e.target.value)}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 bg-white min-h-[36px]"
+                        />
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
-            )}
-          </section>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={addItem}
+            className="w-full border-2 border-dashed border-gray-300 text-gray-500 rounded-lg py-3 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 flex items-center justify-center gap-2 mb-4 min-h-[44px]"
+          >
+            <FiPlus className="w-4 h-4" /> Add Another Item
+          </button>
 
           <div className="flex gap-2 mt-4">
             <button
@@ -253,7 +361,7 @@ export default function CreateSheetWizard({ isOpen, onClose, onCreated }) {
             <button
               type="button"
               onClick={handleCreate}
-              disabled={loading}
+              disabled={loading || items.every((i) => !i.name.trim())}
               className="flex-1 bg-slate-700 text-white px-4 py-3 rounded-lg hover:bg-slate-800 text-sm font-medium disabled:opacity-50 min-h-[44px]"
             >
               {loading ? 'Creating...' : 'Create Sheet →'}

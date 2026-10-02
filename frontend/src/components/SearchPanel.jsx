@@ -23,8 +23,8 @@ function formatSearchDateLabel(dateStr) {
   return format(parseInputDate(dateStr), 'EEEE, d MMM yyyy');
 }
 
-function getCustomValues(row) {
-  const raw = row.customValues;
+function getWorkerValues(row) {
+  const raw = row.workerValues;
   if (!raw) return {};
   if (raw instanceof Map) {
     return Object.fromEntries(raw);
@@ -32,11 +32,11 @@ function getCustomValues(row) {
   return raw;
 }
 
-function formatCustomValues(row, customColumns) {
-  const values = getCustomValues(row);
+function formatWorkerValues(row, workerColumns) {
+  const values = getWorkerValues(row);
   const columns =
-    customColumns?.length > 0
-      ? customColumns
+    workerColumns?.length > 0
+      ? workerColumns
       : Object.keys(values).sort();
 
   return columns
@@ -87,7 +87,7 @@ function SearchPanelContent({ onClose, searchDate, setSearchDate, quickSelect, s
     (sum, group) => sum + (group.matchingRows?.length || 0),
     0
   ) ?? 0;
-  const sheetCount = searchResults?.length ?? 0;
+  const groupCount = searchResults?.length ?? 0;
 
   return (
     <>
@@ -155,17 +155,24 @@ function SearchPanelContent({ onClose, searchDate, setSearchDate, quickSelect, s
 
         {!searching && searchResults && searchResults.length > 0 && (
           <div>
-            {searchResults.map((group) => (
-              <div key={group.sheetId}>
+            {searchResults.map((group, idx) => (
+              <div key={`${group.sheetId}-${group.itemId}-${idx}`}>
                 <div className="flex items-center justify-between mb-2 mt-4 first:mt-0">
-                  <span className="font-semibold text-gray-800 text-sm">
-                    📄 {group.sheetTitle}
-                  </span>
+                  <div>
+                    <span className="font-semibold text-gray-800 text-sm">
+                      📄 {group.sheetTitle}
+                    </span>
+                    {group.itemName && (
+                      <span className="text-xs text-gray-500 ml-2">
+                        → {group.itemName}
+                      </span>
+                    )}
+                  </div>
                   <StatusBadge status={group.status || 'Upcoming'} />
                 </div>
 
                 {group.matchingRows.map((row) => {
-                  const customText = formatCustomValues(row, group.customColumns);
+                  const workerText = formatWorkerValues(row, group.workerColumns);
                   return (
                     <div
                       key={row._id}
@@ -190,8 +197,8 @@ function SearchPanelContent({ onClose, searchDate, setSearchDate, quickSelect, s
                         </p>
                       ) : null}
 
-                      {customText ? (
-                        <p className="text-xs text-gray-500 mt-1">{customText}</p>
+                      {workerText ? (
+                        <p className="text-xs text-gray-500 mt-1">{workerText}</p>
                       ) : null}
                     </div>
                   );
@@ -201,7 +208,7 @@ function SearchPanelContent({ onClose, searchDate, setSearchDate, quickSelect, s
 
             <p className="text-xs text-gray-400 text-center mt-3 pb-2">
               Found {totalEntries} {totalEntries === 1 ? 'entry' : 'entries'} across{' '}
-              {sheetCount} {sheetCount === 1 ? 'sheet' : 'sheets'}
+              {groupCount} {groupCount === 1 ? 'item' : 'items'}
             </p>
           </div>
         )}

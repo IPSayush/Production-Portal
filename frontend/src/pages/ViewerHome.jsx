@@ -1,12 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiEye, FiClipboard, FiSearch } from 'react-icons/fi';
+import { FiEye, FiClipboard, FiSearch, FiPackage } from 'react-icons/fi';
 import Header from '../components/Header';
 import SearchPanel from '../components/SearchPanel';
 import SheetCardImage from '../components/SheetCardImage';
 import SkeletonCard from '../components/SkeletonCard';
 import StatusBadge from '../components/StatusBadge';
-import { ProgressSummaryCompact } from '../components/ProgressSummary';
 import { formatSheetDate } from '../utils/dateUtils';
 import { useSheets } from '../context/SheetsContext';
 
@@ -104,44 +103,69 @@ export default function ViewerHome() {
           </p>
         ) : (
           <div className="space-y-4">
-            {filteredSheets.map((sheet) => (
-              <article
-                key={sheet._id}
-                className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm"
-              >
-                <SheetCardImage imageUrl={sheet.imageUrl} title={sheet.title} />
+            {filteredSheets.map((sheet) => {
+              const totalItems = sheet.totalItems || 0;
+              const completedItems = sheet.completedItems || 0;
+              const totalTarget = sheet.totalTarget || 0;
+              const totalAchieved = sheet.totalAchieved || 0;
+              const progressPct = totalTarget > 0
+                ? Math.min(100, Math.round((totalAchieved / totalTarget) * 100))
+                : 0;
 
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <StatusBadge status={sheet.status || 'Upcoming'} />
-                    <span className="text-xs text-slate-500 shrink-0">
-                      {formatSheetDate(sheet.updatedAt || sheet.createdAt)}
-                    </span>
+              return (
+                <article
+                  key={sheet._id}
+                  className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm"
+                >
+                  <SheetCardImage imageUrl={sheet.imageUrl} title={sheet.title} />
+
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <StatusBadge status={sheet.status || 'Upcoming'} />
+                      <span className="text-xs text-slate-500 shrink-0">
+                        {formatSheetDate(sheet.updatedAt || sheet.createdAt)}
+                      </span>
+                    </div>
+
+                    <h2 className="font-bold text-base text-slate-800">{sheet.title}</h2>
+                    {sheet.description ? (
+                      <p className="text-xs text-gray-500 italic mt-1 truncate">
+                        {sheet.description}
+                      </p>
+                    ) : null}
+
+                    {/* Items & Progress */}
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                        <span className="flex items-center gap-1">
+                          <FiPackage className="w-3.5 h-3.5" />
+                          {completedItems}/{totalItems} items done
+                        </span>
+                        <span className="font-medium text-slate-700">
+                          {totalAchieved.toLocaleString('en-IN')}/{totalTarget.toLocaleString('en-IN')} pcs
+                        </span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-slate-700 rounded-full transition-all"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5 text-right">{progressPct}%</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleView(sheet._id)}
+                      className="mt-4 w-full flex items-center justify-center gap-2 bg-slate-700 text-white py-3 rounded-lg text-sm font-medium hover:bg-slate-800 min-h-[44px]"
+                    >
+                      <FiEye className="w-5 h-5" />
+                      View Items →
+                    </button>
                   </div>
-
-                  <h2 className="font-bold text-base text-slate-800">{sheet.title}</h2>
-                  {sheet.description ? (
-                    <p className="text-xs text-gray-500 italic mt-1 truncate">
-                      {sheet.description}
-                    </p>
-                  ) : null}
-
-                  <ProgressSummaryCompact
-                    targetQuantity={sheet.targetQuantity}
-                    achievedQuantity={sheet.achievedQuantity}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => handleView(sheet._id)}
-                    className="mt-4 w-full flex items-center justify-center gap-2 bg-slate-700 text-white py-3 rounded-lg text-sm font-medium hover:bg-slate-800 min-h-[44px]"
-                  >
-                    <FiEye className="w-5 h-5" />
-                    View Sheet →
-                  </button>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

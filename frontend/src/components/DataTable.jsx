@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { FiTrash2 } from 'react-icons/fi';
 import { formatInputDate, formatSheetDate, parseInputDate } from '../utils/dateUtils';
 
-function mapCustomValues(customValues) {
-  if (!customValues) return {};
-  if (customValues instanceof Map) {
-    return Object.fromEntries(customValues);
+function mapWorkerValues(workerValues) {
+  if (!workerValues) return {};
+  if (workerValues instanceof Map) {
+    return Object.fromEntries(workerValues);
   }
-  if (typeof customValues === 'object') {
-    return { ...customValues };
+  if (typeof workerValues === 'object') {
+    return { ...workerValues };
   }
   return {};
 }
@@ -31,13 +31,13 @@ export default function DataTable({
   const updateRow = (rowIndex, field, value) => {
     const updated = rows.map((row, i) => {
       if (i !== rowIndex) return row;
-      if (field.startsWith('custom_')) {
-        const colName = field.replace('custom_', '');
-        const customValues = { ...mapCustomValues(row.customValues) };
-        customValues[colName] = value;
-        return { ...row, customValues };
+      if (field.startsWith('worker_')) {
+        const colName = field.replace('worker_', '');
+        const workerValues = { ...mapWorkerValues(row.workerValues) };
+        workerValues[colName] = value;
+        return { ...row, workerValues, _dirty: row._id && !row.isNew ? true : row._dirty };
       }
-      return { ...row, [field]: value };
+      return { ...row, [field]: value, _dirty: row._id && !row.isNew ? true : row._dirty };
     });
     onRowsChange(updated);
   };
@@ -57,12 +57,12 @@ export default function DataTable({
       updated[index] = trimmed;
 
       const updatedRows = rows.map((row) => {
-        const cv = mapCustomValues(row.customValues);
-        if (cv[oldName] !== undefined) {
-          cv[trimmed] = cv[oldName];
-          delete cv[oldName];
+        const wv = mapWorkerValues(row.workerValues);
+        if (wv[oldName] !== undefined) {
+          wv[trimmed] = wv[oldName];
+          delete wv[oldName];
         }
-        return { ...row, customValues: cv };
+        return { ...row, workerValues: wv };
       });
 
       onColumnsChange(updated, updatedRows);
@@ -179,7 +179,7 @@ export default function DataTable({
                   )}
                 </td>
                 {customColumns.map((col) => {
-                  const cv = mapCustomValues(row.customValues);
+                  const wv = mapWorkerValues(row.workerValues);
                   return (
                     <td
                       key={col}
@@ -188,14 +188,14 @@ export default function DataTable({
                       {isManager ? (
                         <input
                           type="text"
-                          value={cv[col] || ''}
+                          value={wv[col] || ''}
                           onChange={(e) =>
-                            updateRow(rowIndex, `custom_${col}`, e.target.value)
+                            updateRow(rowIndex, `worker_${col}`, e.target.value)
                           }
                           className="w-full bg-transparent border-0 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 rounded px-1 py-1 min-h-[36px]"
                         />
                       ) : (
-                        <div className="text-slate-600 py-1">{cv[col] || '—'}</div>
+                        <div className="text-slate-600 py-1">{wv[col] || '—'}</div>
                       )}
                     </td>
                   );

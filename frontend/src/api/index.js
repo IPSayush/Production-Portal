@@ -48,19 +48,34 @@ export const authApi = {
 };
 
 export const sheetsApi = {
+  // Sheet CRUD
   getAll: (page = 1, limit = 50) =>
     api.get('/sheets', { params: { page, limit } }),
-  getOne: (id, page = 1, limit = 50) =>
-    api.get(`/sheets/${id}`, { params: { page, limit } }),
+  getOne: (id) =>
+    api.get(`/sheets/${id}`),
   create: (data) => api.post('/sheets', data),
   update: (id, data) => api.put(`/sheets/${id}`, data),
   updateStatus: (id, status) => api.patch(`/sheets/${id}/status`, { status }),
   delete: (id, password) => api.delete(`/sheets/${id}`, { data: { password } }),
-  addRow: (sheetId, data) => api.post(`/sheets/${sheetId}/rows`, data),
-  updateRow: (sheetId, rowId, data) =>
-    api.put(`/sheets/${sheetId}/rows/${rowId}`, data),
-  deleteRow: (sheetId, rowId, password) =>
-    api.delete(`/sheets/${sheetId}/rows/${rowId}`, { data: { password } }),
+
+  // Item CRUD
+  addItem: (sheetId, data) => api.post(`/sheets/${sheetId}/items`, data),
+  updateItem: (sheetId, itemId, data) =>
+    api.put(`/sheets/${sheetId}/items/${itemId}`, data),
+  deleteItem: (sheetId, itemId, password) =>
+    api.delete(`/sheets/${sheetId}/items/${itemId}`, { data: { password } }),
+  getItem: (sheetId, itemId, page = 1, limit = 10000) =>
+    api.get(`/sheets/${sheetId}/items/${itemId}`, { params: { page, limit } }),
+
+  // Item Row CRUD
+  addRow: (sheetId, itemId, data) =>
+    api.post(`/sheets/${sheetId}/items/${itemId}/rows`, data),
+  updateRow: (sheetId, itemId, rowId, data) =>
+    api.put(`/sheets/${sheetId}/items/${itemId}/rows/${rowId}`, data),
+  deleteRow: (sheetId, itemId, rowId, password) =>
+    api.delete(`/sheets/${sheetId}/items/${itemId}/rows/${rowId}`, { data: { password } }),
+
+  // Search
   searchByDate: (date, tz) =>
     api.get('/sheets/search', { params: { date, tz } }),
 };

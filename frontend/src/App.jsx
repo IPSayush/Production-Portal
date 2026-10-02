@@ -9,6 +9,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ManagerHome = lazy(() => import('./pages/ManagerHome'));
 const ViewerHome = lazy(() => import('./pages/ViewerHome'));
 const SheetDetail = lazy(() => import('./pages/SheetDetail'));
+const ItemDetail = lazy(() => import('./pages/ItemDetail'));
 
 export default function App() {
   return (
@@ -39,6 +40,14 @@ export default function App() {
             element={
               <AuthRoute>
                 <SheetDetail />
+              </AuthRoute>
+            }
+          />
+          <Route
+            path="/sheet/:sheetId/item/:itemId"
+            element={
+              <AuthRoute>
+                <ItemDetail />
               </AuthRoute>
             }
           />
